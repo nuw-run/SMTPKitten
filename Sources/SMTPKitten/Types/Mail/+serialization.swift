@@ -1,6 +1,7 @@
 import NIOCore
 import Foundation
 import MultipartKit
+@_spi(CMS) import X509
 
 extension Mail.Content.Block {
     var headers: [String: String] {
@@ -42,7 +43,20 @@ extension Mail.Content.Block {
                 "Content-Disposition": disposition,
                 "Content-Transfer-Encoding": "base64",
             ]
+        case .signedMessage(let boundary, _, _, _):
+            return [
+                "Content-Type": "multipart/signed; protocol=\"application/pkcs7-signature\"; micalg=sha-256; boundary=\"\(boundary)\"",
+            ]
+        /*case .signature(let signature):
+            return [
+                "Content-Type": "application/pkcs7-signature; name=smime.p7s",
+                "Content-Disposition": "attachment; filename=smime.p7s",
+                "Content-Transfer-Encoding": "base64",
+            ]
+         */
         }
+
+
     }
 
     @discardableResult
@@ -77,6 +91,61 @@ extension Mail.Content.Block {
             return buffer.writeString(image.base64)
         case .attachment(let attachment):
             return buffer.writeString(attachment.base64)
+        case .signedMessage(let boundary, let html, let certificate, let key):
+            let writtenBytes = buffer.writerIndex
+            var signBuffer = ByteBufferAllocator().buffer(capacity: 0)
+            let part = MultipartPart(
+                headers: [
+                    "Content-Type": "text/html; charset=utf-8",
+                    "Content-Transfer-Encoding": "base64"
+                ],
+                body: html.base64Encoded
+            )
+            for (key, val) in part.headers {
+                signBuffer.writeString(key)
+                signBuffer.writeString(": ")
+                signBuffer.writeString(val)
+                signBuffer.writeString("\r\n")
+            }
+            signBuffer.writeString("\r\n")
+            var body = part.body
+            signBuffer.writeBuffer(&body)
+            //signBuffer.writeString("\r\n")
+            signBuffer.moveReaderIndex(to: 0)
+            let data = signBuffer.readData(length: signBuffer.readableBytes)!
+            var alg:  Certificate.SignatureAlgorithm!
+
+            // That's absolutely ugly, and wrong and bogus. `X509.Certificate` doesn't allow accessing the BackingPublicKey, only
+            // a lame string `description`
+            switch certificate.publicKey.description.prefix(3) {
+            case "RSA":
+                alg = .sha256WithRSAEncryption
+            case "P256", "P384", "P521":
+                alg = .ecdsaWithSHA256
+            case "Ed2":
+                alg = .ed25519
+            default:
+                alg = .sha1WithRSAEncryption
+            }
+            let signed = try X509.CMS.sign(data, signatureAlgorithm: alg, certificate: certificate, privateKey: key)
+            let signedData = Data(signed)
+
+            try MultipartSerializer().serialize(
+                parts: [
+                    part,
+                    MultipartPart(
+                        headers: [
+                            "Content-Type": "application/pkcs7-signature; name=smime.p7s",
+                            "Content-Disposition": "attachment; filename=smime.p7s",
+                            "Content-Transfer-Encoding": "base64",
+                        ],
+                        body: signedData.base64EncodedString(options: .lineLength76Characters)
+                    ),
+                ],
+                boundary: boundary,
+                into: &buffer
+            )
+            return buffer.writerIndex - writtenBytes
         }
     }
 }

@@ -1,5 +1,6 @@
 import Foundation
 import NIO
+import X509
 
 extension Mail {
     public struct Content: Sendable {
@@ -17,6 +18,10 @@ extension Mail {
             case image(Image)
             case attachment(Attachment)
             case alternative(boundary: String, text: String, html: String)
+            /// A signed message enveloppe
+            case signedMessage(boundary: String, html: String, certificate: Certificate, key: Certificate.PrivateKey)
+            /// A PKCS7 signature
+            //case signature(_ signature: String)
         }
 
         internal enum _Content: Sendable {
@@ -70,6 +75,11 @@ extension Mail {
         public static func alternative(_ blocks: [Content]) -> Content {
             return .multipart(blocks.flatMap(\.blocks))
         }
+
+        public static func signed(html: String, certificate: Certificate, key: Certificate.PrivateKey) -> Content {
+            return .single(.signedMessage(boundary: UUID().uuidString, html: html, certificate: certificate, key: key))
+        }
+
     }
 }
 
