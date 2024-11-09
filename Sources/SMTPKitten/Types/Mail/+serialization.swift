@@ -47,13 +47,6 @@ extension Mail.Content.Block {
             return [
                 "Content-Type": "multipart/signed; protocol=\"application/pkcs7-signature\"; micalg=sha-256; boundary=\"\(boundary)\"",
             ]
-        /*case .signature(let signature):
-            return [
-                "Content-Type": "application/pkcs7-signature; name=smime.p7s",
-                "Content-Disposition": "attachment; filename=smime.p7s",
-                "Content-Transfer-Encoding": "base64",
-            ]
-         */
         }
 
 

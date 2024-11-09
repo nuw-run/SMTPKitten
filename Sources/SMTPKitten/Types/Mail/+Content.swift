@@ -18,10 +18,8 @@ extension Mail {
             case image(Image)
             case attachment(Attachment)
             case alternative(boundary: String, text: String, html: String)
-            /// A signed message enveloppe
+            /// An S/MIME  signed message
             case signedMessage(boundary: String, html: String, certificate: Certificate, key: Certificate.PrivateKey)
-            /// A PKCS7 signature
-            //case signature(_ signature: String)
         }
 
         internal enum _Content: Sendable {
