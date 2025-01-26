@@ -110,7 +110,7 @@ extension Mail.Content.Block {
 
             // That's absolutely ugly, and wrong and bogus. `X509.Certificate` doesn't allow accessing the BackingPublicKey, only
             // a lame string `description`
-            switch certificate.publicKey.description.prefix(3) {
+            switch certificate.publicKey.description.prefix(4) {
             case "RSA":
                 alg = .sha256WithRSAEncryption
             case "P256", "P384", "P521":
